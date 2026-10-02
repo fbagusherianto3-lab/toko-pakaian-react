@@ -1,4 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  loadStoreData,
+  saveStoreData,
+  type LocalStoreData,
+} from "./data/localDatabase.ts";
 
 // =====================================================
 // TYPES & INTERFACES
@@ -93,8 +98,7 @@ const INITIAL_PRODUCTS: Product[] = [
     price: 75000,
     category: "Pria",
     sizes: ["S", "M", "L", "XL"],
-    image:
-      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800",
+    image: "/offline-product.svg",
     stock: 25,
   },
   {
@@ -103,8 +107,7 @@ const INITIAL_PRODUCTS: Product[] = [
     price: 135000,
     category: "Pria",
     sizes: ["M", "L", "XL"],
-    image:
-      "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=800",
+    image: "/offline-product.svg",
     stock: 18,
   },
   {
@@ -113,8 +116,7 @@ const INITIAL_PRODUCTS: Product[] = [
     price: 185000,
     category: "Unisex",
     sizes: ["M", "L", "XL", "XXL"],
-    image:
-      "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800",
+    image: "/offline-product.svg",
     stock: 12,
   },
   {
@@ -123,8 +125,7 @@ const INITIAL_PRODUCTS: Product[] = [
     price: 145000,
     category: "Wanita",
     sizes: ["S", "M", "L"],
-    image:
-      "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800",
+    image: "/offline-product.svg",
     stock: 10,
   },
   {
@@ -133,8 +134,7 @@ const INITIAL_PRODUCTS: Product[] = [
     price: 220000,
     category: "Unisex",
     sizes: ["M", "L", "XL"],
-    image:
-      "https://images.unsplash.com/photo-1543076447-215ad9ba6923?w=800",
+    image: "/offline-product.svg",
     stock: 15,
   },
   {
@@ -143,8 +143,7 @@ const INITIAL_PRODUCTS: Product[] = [
     price: 245000,
     category: "Import",
     sizes: ["All Size"],
-    image:
-      "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800",
+    image: "/offline-product.svg",
     stock: 8,
   },
   {
@@ -153,18 +152,16 @@ const INITIAL_PRODUCTS: Product[] = [
     price: 55000,
     category: "Anak-Anak",
     sizes: ["S", "M", "L"],
-    image:
-      "https://images.unsplash.com/photo-1519457431-44ccd64a579b?w=800",
+    image: "/offline-product.svg",
     stock: 20,
   },
   {
     id: 8,
     name: "Dress Anak Motif Bunga",
     price: 85000,
-    category: "Anak perempuan",
+    category: "Anak-Anak",
     sizes: ["S", "M", "L"],
-    image:
-      "https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800",
+    image: "/offline-product.svg",
     stock: 14,
   },
 ];
@@ -207,8 +204,27 @@ const CATEGORIES: { name: Category; label: string }[] = [
 const formatRupiah = (value: number) =>
   `Rp ${value.toLocaleString("id-ID")}`;
 
-const DEFAULT_PRODUCT_IMAGE =
-  "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800";
+const createOrderId = () => `INV-${Date.now().toString().slice(-6)}`;
+
+const DEFAULT_PRODUCT_IMAGE = "/offline-product.svg";
+
+const isLocalProductImage = (image: string) =>
+  image.startsWith("data:image/") ||
+  (image.startsWith("/") && !image.startsWith("//"));
+
+const getLocalProductImage = (image: string) =>
+  isLocalProductImage(image) ? image : DEFAULT_PRODUCT_IMAGE;
+
+const readImageAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      typeof reader.result === "string"
+        ? resolve(reader.result)
+        : reject(new Error("Format gambar tidak didukung."));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 
 // =====================================================
 // MAIN APP
@@ -259,6 +275,43 @@ export default function App() {
   // ===================================================
 
   const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [databaseReady, setDatabaseReady] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void loadStoreData<Product, OrderItem>(INITIAL_PRODUCTS)
+      .then((storedData: LocalStoreData<Product, OrderItem>) => {
+        if (!isMounted) return;
+        setProductList(
+          storedData.products.map((product) => ({
+            ...product,
+            image: getLocalProductImage(product.image),
+          })),
+        );
+        setOrders(storedData.orders);
+        setHiddenStockListIds(storedData.hiddenStockListIds);
+        setDatabaseReady(true);
+      })
+      .catch((error: unknown) => {
+        console.error("Gagal membuka database lokal:", error);
+        if (isMounted) setDatabaseReady(true);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!databaseReady) return;
+
+    void saveStoreData(productList, orders, hiddenStockListIds).catch(
+      (error: unknown) => {
+        console.error("Gagal menyimpan database lokal:", error);
+      },
+    );
+  }, [databaseReady, productList, orders, hiddenStockListIds]);
 
   const [paymentMethod, setPaymentMethod] =
     useState("QRIS / e-Wallet");
@@ -647,9 +700,7 @@ export default function App() {
       }
     }
 
-    const orderId = `INV-${Date.now()
-      .toString()
-      .slice(-6)}`;
+    const orderId = createOrderId();
 
     const newOrder: OrderItem = {
       id: orderId,
@@ -895,15 +946,19 @@ export default function App() {
       return;
     }
 
+    const image = newProduct.image.trim();
+    if (image && !isLocalProductImage(image)) {
+      showToast("Gunakan path gambar lokal, bukan URL internet.");
+      return;
+    }
+
     const createdProduct: Product = {
       id: Date.now(),
       name,
       price,
       category: newProduct.category,
       sizes,
-      image:
-        newProduct.image.trim() ||
-        DEFAULT_PRODUCT_IMAGE,
+      image: image || DEFAULT_PRODUCT_IMAGE,
       stock,
     };
 
@@ -992,6 +1047,12 @@ export default function App() {
       return;
     }
 
+    const image = editProductForm.image.trim();
+    if (image && !isLocalProductImage(image)) {
+      showToast("Gunakan path gambar lokal, bukan URL internet.");
+      return;
+    }
+
     setProductList((previousProducts) =>
       previousProducts.map((product) => {
         if (
@@ -1008,9 +1069,7 @@ export default function App() {
           category:
             editProductForm.category,
           sizes,
-          image:
-            editProductForm.image.trim() ||
-            product.image,
+          image: image || product.image,
           stock,
         };
       })
@@ -1068,6 +1127,18 @@ export default function App() {
       "✏️ Produk berhasil diperbarui!"
     );
   };
+
+  // ===================================================
+  // DATABASE LOADING
+  // ===================================================
+
+  if (!databaseReady) {
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
+        Memuat database lokal...
+      </div>
+    );
+  }
 
   // ===================================================
   // LOGIN PAGE
@@ -1739,6 +1810,31 @@ export default function App() {
           box-shadow:
             0 20px 60px
             rgba(0,0,0,.2);
+        }
+
+        .edit-product-modal {
+          background: #0b0b0b;
+          color: #f5f5f5;
+          border: 1px solid #303030;
+        }
+
+        .edit-product-modal h3 {
+          color: #fff;
+        }
+
+        .edit-product-form label {
+          display: block;
+          color: #f5f5f5;
+          margin-bottom: 4px;
+        }
+
+        .edit-product-form .form-input {
+          box-sizing: border-box;
+          display: block;
+          margin-top: 0;
+          margin-bottom: 14px;
+          color: #111;
+          background: #fff;
         }
 
         .form-input {
@@ -2564,8 +2660,8 @@ export default function App() {
                         onError={(
                           event
                         ) => {
-                          event.currentTarget.src =
-                            DEFAULT_PRODUCT_IMAGE;
+                          event.currentTarget.onerror = null;
+                          event.currentTarget.src = DEFAULT_PRODUCT_IMAGE;
                         }}
                       />
 
@@ -3004,6 +3100,10 @@ export default function App() {
                             item.product
                               .name
                           }
+                          onError={(event) => {
+                            event.currentTarget.onerror = null;
+                            event.currentTarget.src = DEFAULT_PRODUCT_IMAGE;
+                          }}
                           style={{
                             width:
                               "60px",
@@ -3698,7 +3798,7 @@ export default function App() {
             }
           />
 
-          <div className="modal-box">
+          <div className="modal-box edit-product-modal">
             <div
               style={{
                 display:
@@ -3730,6 +3830,7 @@ export default function App() {
             </div>
 
             <form
+              className="edit-product-form"
               onSubmit={
                 handleEditProductSubmit
               }
@@ -3925,27 +4026,23 @@ export default function App() {
                     "bold",
                 }}
               >
-                URL Gambar
+                Gambar Produk
               </label>
 
               <input
                 className="form-input"
-                value={
-                  editProductForm.image
-                }
-                onChange={(
-                  event
-                ) =>
-                  setEditProductForm(
-                    {
-                      ...editProductForm,
-                      image:
-                        event
-                          .target
-                          .value,
-                    }
-                  )
-                }
+                type="file"
+                accept="image/*"
+                onChange={async (event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (!file) return;
+                  try {
+                    const image = await readImageAsDataUrl(file);
+                    setEditProductForm({ ...editProductForm, image });
+                  } catch {
+                    showToast("Gambar tidak dapat dibaca.");
+                  }
+                }}
               />
 
               <div
@@ -4224,27 +4321,23 @@ export default function App() {
                     "bold",
                 }}
               >
-                URL Gambar
-                (Opsional)
+                Gambar Produk (Opsional)
               </label>
 
               <input
                 className="form-input"
-                placeholder="https://..."
-                value={
-                  newProduct.image
-                }
-                onChange={(
-                  event
-                ) =>
-                  setNewProduct({
-                    ...newProduct,
-                    image:
-                      event
-                        .target
-                        .value,
-                  })
-                }
+                type="file"
+                accept="image/*"
+                onChange={async (event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (!file) return;
+                  try {
+                    const image = await readImageAsDataUrl(file);
+                    setNewProduct({ ...newProduct, image });
+                  } catch {
+                    showToast("Gambar tidak dapat dibaca.");
+                  }
+                }}
               />
 
               <div

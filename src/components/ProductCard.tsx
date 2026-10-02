@@ -1,5 +1,5 @@
 import React from 'react';
-import { Product } from '../types/product';
+import type { Product } from '../types/product';
 
 interface ProductCardProps {
   product: Product;
@@ -20,6 +20,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
       <img 
         src={product.image} 
         alt={product.name} 
+        onError={(event) => {
+          event.currentTarget.onerror = null;
+          event.currentTarget.src = '/offline-product.svg';
+        }}
         style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '4px' }} 
       />
       <h3 style={{ margin: '0.5rem 0 0.2rem' }}>{product.name}</h3>
