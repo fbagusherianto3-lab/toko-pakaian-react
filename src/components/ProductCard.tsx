@@ -27,7 +27,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
         style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '4px' }} 
       />
       <h3 style={{ margin: '0.5rem 0 0.2rem' }}>{product.name}</h3>
-      <p style={{ color: '#888', margin: '0 0 0.5rem' }}>{product.category}</p>
+      <p style={{ color: '#ec1f1f', margin: '0 0 0.5rem' }}>{product.category}</p>
       <p style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '1.1rem' }}>
         Rp {product.price.toLocaleString('id-ID')}
       </p>
@@ -35,8 +35,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
         onClick={() => onAddToCart(product)}
         style={{
           padding: '0.5rem 1rem',
-          backgroundColor: '#007bff',
-          color: '#fff',
+          backgroundColor: '#208cff',
+          color: '#0f0202',
           border: 'none',
           borderRadius: '4px',
           cursor: 'pointer',

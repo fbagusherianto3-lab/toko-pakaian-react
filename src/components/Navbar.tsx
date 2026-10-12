@@ -12,11 +12,11 @@ export const Navbar: React.FC<NavbarProps> = ({ cartCount }) => {
       alignItems: 'center',
       padding: '1rem 2rem',
       backgroundColor: '#1a1a1a',
-      color: '#fff',
+      color: '#ee0d0d',
     }}>
       <h2 style={{ margin: 0 }}>TokoPakaianku</h2>
       <div style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
-        🛒 Keranjang: <span style={{ color: '#4caf50' }}>{cartCount}</span>
+        🛒 Keranjang: <span style={{ color: '#131513' }}>{cartCount}</span>
       </div>
     </nav>
   );
